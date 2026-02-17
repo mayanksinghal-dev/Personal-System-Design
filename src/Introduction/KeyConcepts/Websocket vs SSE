@@ -1,0 +1,412 @@
+1️⃣ Conceptual Overview
+Server-Sent Events (SSE)
+
+A unidirectional streaming mechanism over HTTP where:
+
+Client opens a long-lived HTTP connection
+
+Server continuously pushes text events
+
+Built on top of standard HTTP
+
+Browser API: EventSource
+
+Think:
+
+“HTTP response that never ends.”
+
+WebSockets
+
+A full-duplex communication protocol that:
+
+Starts as HTTP
+
+Upgrades via 101 Switching Protocols
+
+Becomes a persistent bidirectional TCP connection
+
+Think:
+
+“Persistent TCP socket exposed to the browser.”
+
+2️⃣ Protocol-Level Differences
+🔹 SSE
+
+Protocol: HTTP/1.1 or HTTP/2
+
+Content-Type: text/event-stream
+
+Text-based only
+
+Server → Client only
+
+Automatic reconnection
+
+Built-in event ID tracking
+
+Message format:
+
+event: update
+data: {"price": 101.2}
+id: 42
+
+
+🔹 WebSockets
+
+Protocol: ws:// or wss://
+
+Upgrades from HTTP
+
+Frame-based protocol
+
+Supports:
+
+Text frames
+
+Binary frames
+
+Full duplex
+
+Custom ping/pong control frames
+
+Frame example:
+
+FIN | OPCODE | MASK | PAYLOAD
+
+3️⃣ Connection Lifecycle Comparison
+Step	SSE	WebSocket
+Initial handshake	HTTP GET	HTTP GET + Upgrade
+Persistent connection	Yes	Yes
+Reconnection	Automatic	Manual
+Keepalive	Server comment :	Ping/Pong frames
+4️⃣ Latency & Throughput
+Latency
+
+WebSockets generally lower framing overhead.
+
+SSE includes HTTP chunking.
+
+WebSocket frames are smaller.
+
+In high-frequency systems:
+
+WebSockets outperform SSE.
+
+Throughput
+
+SSE:
+
+Text only
+
+More overhead per message
+
+Poor for bursty high-frequency data
+
+WebSockets:
+
+Binary supported
+
+Efficient framing
+
+Better for high message volume
+
+Interview insight:
+
+If you're streaming thousands of updates per second → WebSockets.
+
+5️⃣ Scaling Considerations (Very Important for Interviews)
+
+Both create long-lived connections.
+
+🔹 Problem: Connection Fanout
+
+If 1M users connect:
+
+You now maintain 1M open sockets.
+
+This affects:
+
+Memory
+
+File descriptors
+
+Kernel limits
+
+Load balancer configuration
+
+SSE Scaling Challenges
+
+HTTP connection limits per browser (~6 per domain in HTTP/1.1)
+
+Reverse proxy buffering issues
+
+Less flexible backpressure control
+
+More overhead under high throughput
+
+WebSocket Scaling Challenges
+
+Sticky sessions often required
+
+Need distributed pub/sub
+
+Harder to load balance
+
+Typical production solution:
+
+Client
+  ↓
+Load Balancer
+  ↓
+WebSocket Servers
+  ↓
+Redis / Kafka PubSub
+  ↓
+Backend services
+
+
+Both SSE and WebSockets need a message broker at scale.
+
+6️⃣ Backpressure Handling
+SSE
+
+Limited control.
+If client is slow:
+
+Server buffer grows
+
+Risk of memory pressure
+
+Less fine-grained control.
+
+WebSockets
+
+Better backpressure handling:
+
+Can monitor send buffer
+
+Can apply flow control
+
+More flexible buffering strategies
+
+Important in:
+
+Market data
+
+Gaming
+
+Realtime collaboration
+
+7️⃣ Reliability & Reconnection
+SSE
+
+Advantages:
+
+Automatic reconnection
+
+Last-Event-ID header support
+
+Simple resume mechanism
+
+Great for:
+
+News feeds
+
+Notifications
+
+Event logs
+
+WebSockets
+
+Must implement reconnection manually
+
+Must reauthenticate
+
+Must resubscribe to channels
+
+More work but more control
+
+8️⃣ Security
+
+Both use TLS:
+
+HTTPS for SSE
+
+WSS for WebSockets
+
+WebSockets:
+
+Can be more complex behind corporate proxies
+
+Some legacy firewalls block WS upgrade
+
+SSE:
+
+Works almost everywhere HTTP works
+
+9️⃣ Resource Usage Comparison
+Factor	SSE	WebSockets
+Memory per connection	Moderate	Slightly lower
+CPU overhead	Higher under load	More efficient
+Binary support	No	Yes
+Duplex	No	Yes
+Proxy friendliness	High	Medium
+Complexity	Low	Higher
+🔟 When Interviewers Expect You to Choose Each
+Choose SSE When:
+
+One-way streaming
+
+Moderate frequency
+
+Simplicity matters
+
+Automatic retry is helpful
+
+Corporate network compatibility needed
+
+Examples:
+
+Notification service
+
+Live news feed
+
+CI/CD build logs
+
+Portfolio tracker
+
+Choose WebSockets When:
+
+Bidirectional communication
+
+High-frequency updates
+
+Binary data needed
+
+Tight latency requirements
+
+Fine-grained control required
+
+Examples:
+
+Trading systems
+
+Multiplayer games
+
+Collaborative editors
+
+Chat systems
+
+IoT telemetry
+
+1️⃣1️⃣ Architecture-Level Comparison
+SSE Architecture
+Browser
+   ↓ (HTTP)
+Load Balancer
+   ↓
+SSE Servers
+   ↓
+Message Broker
+
+
+Simpler but less flexible.
+
+WebSocket Architecture
+Browser
+   ↓ (WS)
+Load Balancer (sticky)
+   ↓
+WS Servers
+   ↓
+Redis/Kafka
+   ↓
+Services
+
+
+More complex but scalable.
+
+1️⃣2️⃣ Edge Cases Interviewers May Ask
+❓ What happens if client loses connection?
+
+SSE:
+
+Auto reconnect
+
+Sends Last-Event-ID
+
+WebSocket:
+
+App must detect
+
+Reconnect
+
+Resubscribe
+
+❓ How do you scale to 10M connections?
+
+You discuss:
+
+Horizontal sharding
+
+Event partitioning
+
+Kernel tuning
+
+Epoll / non-blocking IO
+
+Load balancer tuning
+
+Connection multiplexing
+
+Possibly HTTP/2 (for SSE)
+
+1️⃣3️⃣ Modern Reality Check
+
+For serious real-time systems today:
+
+Most companies default to WebSockets.
+
+SSE is used in:
+
+Simpler push systems
+
+Internal dashboards
+
+Lightweight streaming APIs
+
+1️⃣4️⃣ Interview-Ready Summary Statement
+
+If asked:
+
+“Which would you choose?”
+
+You answer:
+
+If one-way, moderate frequency, and simplicity → SSE.
+
+If high throughput, bidirectional, low latency → WebSockets.
+
+For trading or collaborative systems → WebSockets.
+
+For notification feeds → SSE.
+
+1️⃣5️⃣ Deep Insight (High-Level System Design Edge)
+
+The protocol choice is rarely the hardest problem.
+
+The real problems are:
+
+State synchronization
+
+Message ordering
+
+Backpressure
+
+Idempotency
+
+Horizontal scaling
+
+Failure recovery
+
+Strong candidates shift the discussion there.
